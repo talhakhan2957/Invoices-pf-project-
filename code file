@@ -1,0 +1,384 @@
+#include <iostream>
+#include <fstream>
+#include <string>
+#include <vector>
+#include <ctime>
+#include <iomanip>
+#include <sstream>
+#include <cstdlib>
+
+using namespace std;
+
+
+// Ye structure ek Customer ko represent karta hai.
+// Customer ke paas ek ID aur ek name hoga.
+// Ye info "customers.txt" file me save ki jaati hai.
+struct Customer {
+    string id;
+    string name;
+};
+
+// Ye structure ek Product ko represent karta hai.
+// Har product ka ek ID, ek name aur ek price hota hai.
+// Ye info "products.txt" file me save hoti hai.
+struct Product {
+    string id;
+    string name;
+    float price;
+};
+
+// Ye structure ek "Item" ko represent karta hai jo Invoice ke andar hota hai.
+// Har item ek Product hota hai + uski Quantity.
+// Matlab invoice me ek hi product multiple quantity me ho sakta hai.
+struct Item {
+    Product product;
+    int quantity;
+};
+
+
+
+// Ye function current date aur time ko ek readable string me return karta hai.
+// Example: 2025-08-23 15:45
+// Iska use invoices aur invoice records me date/time show karne ke liye hota hai.
+string getDateTime() {
+    time_t now = time(0);
+    tm *ltm = localtime(&now);
+    stringstream ss;
+    ss << 1900 + ltm->tm_year << "-"
+       << setw(2) << setfill('0') << 1 + ltm->tm_mon << "-"
+       << setw(2) << setfill('0') << ltm->tm_mday << " "
+       << setw(2) << setfill('0') << ltm->tm_hour << ":"
+       << setw(2) << setfill('0') << ltm->tm_min;
+    return ss.str();
+}
+
+// Ye function ek naya unique Invoice ID banata hai jo 0001, 0002 ... ke form me hota hai.
+// Function "invoices.txt" file padhta hai aur last invoice ka ID nikalta hai,
+// phir usko +1 karke naya invoice banata hai.
+// Example: agar last invoice 0005 tha, to ye function "0006" return karega.
+string generateInvoiceID() {
+    ifstream in("invoices.txt");
+    string line, lastID = "0000";
+    if (in) {
+        while (getline(in, line)) {
+            if (line.size() >= 4) lastID = line.substr(0, 4); 
+        }
+        in.close();
+    }
+    int num = atoi(lastID.c_str()); // string ko integer me convert karna 
+    if (num < 0) num = 0;
+    num += 1;
+
+    stringstream ss;
+    ss << setw(4) << setfill('0') << num;
+    return ss.str();
+}
+
+
+
+// Ye function ek naya Customer add karta hai.
+// User se Customer ID aur name input liya jata hai aur phir "customers.txt" me save hota hai.
+void addCustomer() {
+    ofstream out("customers.txt", ios::app);
+    if (!out) {
+        cout << "Unable to open customers.txt\n";
+        return;
+    }
+    Customer c;
+    cout << "Enter customer ID: ";
+    cin >> c.id;
+    cin.ignore();
+    cout << "Enter customer name: ";
+    getline(cin, c.name);
+    out << c.id << "," << c.name << endl;
+    out.close();
+    cout << "Customer added.\n";
+}
+
+// Ye function ek naya Product add karta hai.
+// User se Product ID, name aur price input liya jata hai aur phir "products.txt" me save hota hai.
+void addProduct() {
+    ofstream out("products.txt", ios::app);
+    if (!out) {
+        cout << "Unable to open products.txt\n";
+        return;
+    }
+    Product p;
+    cout << "Enter product ID: ";
+    cin >> p.id;
+    cin.ignore();
+    cout << "Enter product name: ";
+    getline(cin, p.name);
+    cout << "Enter product price (in Rs): ";
+    cin >> p.price;
+    out << p.id << "," << p.name << "," << p.price << endl;
+    out.close();
+    cout << "Product added.\n";
+}
+
+// Ye function sare Products ko "products.txt" file se load karke vector me dalta hai.
+// Saath hi user ko product ki list print karke dikhata hai.
+void viewProducts(vector<Product>& productList) {
+    ifstream in("products.txt");
+    string line;
+    productList.clear();
+
+    if (!in) {
+        cout << "\nNo products found (products.txt missing).\n";
+        return;
+    }
+
+    while (getline(in, line)) {
+        Product p;
+        size_t pos1 = line.find(",");
+        size_t pos2 = line.rfind(",");
+        if (pos1 == string::npos || pos2 == string::npos || pos2 <= pos1) continue;
+
+        p.id = line.substr(0, pos1);
+        p.name = line.substr(pos1 + 1, pos2 - pos1 - 1);
+        p.price = (float)atof(line.substr(pos2 + 1).c_str()); 
+        productList.push_back(p);
+    }
+    in.close();
+
+    cout << "\nAvailable Products:\n";
+    for (size_t i = 0; i < productList.size(); i++) {
+        cout << "ID: " << productList[i].id 
+             << " | " << productList[i].name 
+             << " | Rs " << fixed << setprecision(2) << productList[i].price << endl;
+    }
+}
+
+// Ye function ek customer ko ID ke zariye "customers.txt" file se dhoondhta hai.
+Customer getCustomerByID(const string& id) {
+    ifstream in("customers.txt");
+    string line;
+    if (in) {
+        while (getline(in, line)) {
+            size_t pos = line.find(",");
+            if (pos != string::npos && line.substr(0, pos) == id) {
+                Customer c;
+                c.id = id;
+                c.name = line.substr(pos + 1);
+                in.close();
+                return c;
+            }
+        }
+        in.close();
+    }
+    Customer emptyC;
+    emptyC.id = "";
+    emptyC.name = "";
+    return emptyC;
+}
+
+// Ye function ek product ko ID ke zariye search karta hai jo products vector me hota hai.
+Product getProductByID(const string& id, const vector<Product>& products) {
+    for (size_t i = 0; i < products.size(); i++) {
+        if (products[i].id == id) return products[i];
+    }
+    Product emptyP;
+    emptyP.id = "";
+    emptyP.name = "";
+    emptyP.price = 0.0f;
+    return emptyP;
+}
+
+
+
+// Ye function full invoice file ko console par print karta hai aur Windows par 
+// open/print karne ka option deta hai.
+void viewFullInvoice(const string& invoiceID) {
+    string filename = "invoice_" + invoiceID + ".txt";
+    ifstream file(filename.c_str());
+    if (!file) {
+        cout << "Invoice file not found.\n";
+        return;
+    }
+
+    cout << "\n========= FULL INVOICE =========\n\n";
+    string line;
+    while (getline(file, line)) {
+        cout << line << endl;
+    }
+    file.close();
+
+#ifdef _WIN32
+    cout << "\nDo you want to:\n";
+    cout << "1. Open in default text viewer\n";
+    cout << "2. Print this invoice\n";
+    cout << "Enter choice (1/2, else skip): ";
+    int choice;
+    cin >> choice;
+
+    if (choice == 1) {
+        string command = "start " + filename; 
+        system(command.c_str());
+    } else if (choice == 2) {
+        string command = "notepad /p " + filename; 
+        system(command.c_str());
+        cout << "Sending to printer...\n";
+    }
+#endif
+}
+
+// Ye function ek invoice create karta hai.
+// Process: Customer ID lena ? Cart me products dalna ? Totals calculate karna ? Invoice file generate karna.
+void createInvoice() {
+    string customerID;
+    cout << "\nEnter customer ID: ";
+    cin >> customerID;
+    Customer c = getCustomerByID(customerID);
+
+    if (c.id.empty()) {
+        cout << "Customer not found.\n";
+        return;
+    }
+
+    vector<Product> products;
+    viewProducts(products);
+    if (products.empty()) {
+        cout << "No products available to invoice.\n";
+        return;
+    }
+
+    vector<Item> cart;
+    string pid;
+    int qty;
+    char choice;
+
+    do {
+        cout << "\nEnter product ID: ";
+        cin >> pid;
+        Product p = getProductByID(pid, products);
+
+        if (p.id.empty()) {
+            cout << "Product not found.\n";
+        } else {
+            cout << "Enter quantity: ";
+            cin >> qty;
+            if (qty > 0) {
+                Item item;
+                item.product = p;
+                item.quantity = qty;
+                cart.push_back(item);
+                cout << "Added to cart.\n";
+            } else {
+                cout << "Invalid quantity.\n";
+            }
+        }
+        cout << "Add another product? (y/n): ";
+        cin >> choice;
+    } while (choice == 'y' || choice == 'Y');
+
+    if (cart.empty()) {
+        cout << "Cart is empty. Invoice cancelled.\n";
+        return;
+    }
+
+    float subtotal = 0.0f;
+    for (size_t i = 0; i < cart.size(); i++) {
+        subtotal += cart[i].product.price * cart[i].quantity;
+    }
+    float tax = subtotal * 0.1f;  
+    float total = subtotal + tax;
+
+    string invoiceID = generateInvoiceID();
+    string filename = "invoice_" + invoiceID + ".txt";
+
+    ofstream invoiceFile(filename.c_str());
+    if (!invoiceFile) {
+        cout << "Unable to write invoice file.\n";
+        return;
+    }
+
+    invoiceFile << "==============================" << endl;
+    invoiceFile << "         INVOICE             " << endl;
+    invoiceFile << "==============================" << endl;
+    invoiceFile << "Invoice ID: " << invoiceID << endl;
+    invoiceFile << "Date: " << getDateTime() << endl;
+    invoiceFile << "Customer: " << c.name << " (ID: " << c.id << ")\n\n";
+    invoiceFile << left << setw(20) << "Product"
+                << setw(10) << "Qty"
+                << setw(15) << "Price (Rs)"
+                << setw(15) << "Total (Rs)" << endl;
+    invoiceFile << "-------------------------------------------------------\n";
+
+    for (size_t i = 0; i < cart.size(); i++) {
+        float lineTotal = cart[i].product.price * cart[i].quantity;
+        invoiceFile << left << setw(20) << cart[i].product.name
+                    << setw(10) << cart[i].quantity
+                    << "Rs " << setw(12) << fixed << setprecision(2) << cart[i].product.price
+                    << "Rs " << fixed << setprecision(2) << lineTotal << endl;
+    }
+
+    invoiceFile << "\nSubtotal: Rs " << fixed << setprecision(2) << subtotal << endl;
+    invoiceFile << "Tax (10%): Rs " << fixed << setprecision(2) << tax << endl;
+    invoiceFile << "Total: Rs " << fixed << setprecision(2) << total << endl;
+    invoiceFile << "==============================\n";
+    invoiceFile.close();
+
+    ofstream invRef("invoices.txt", ios::app);
+    if (invRef) {
+        invRef << invoiceID << " - " << c.name << " - Rs " << fixed << setprecision(2)
+               << total << " - " << getDateTime() << endl;
+        invRef.close();
+    }
+
+    cout << "\nInvoice generated and saved as: " << filename << endl;
+}
+
+// Ye function sare invoice records show karta hai.
+// Saath me option deta hai ke ek specific invoice file full view me dekho.
+void viewInvoices() {
+    ifstream in("invoices.txt");
+    string line;
+    cout << "\n=========== Invoice Records ===========\n";
+    if (!in) {
+        cout << "(No invoices yet)\n";
+    } else {
+        while (getline(in, line)) {
+            cout << line << endl;
+        }
+        in.close();
+    }
+
+    cout << "\nType 'view full' to see a full invoice or press Enter to return: ";
+    cin.ignore();
+    string input;
+    getline(cin, input);
+
+    if (input == "view full") {
+        string invoiceID;
+        cout << "Enter Invoice ID (e.g., 0001): ";
+        cin >> invoiceID;
+        viewFullInvoice(invoiceID);
+    }
+}
+
+
+// Ye program ka main menu hai jo user se input leta hai aur respective functions call karta hai.
+int main() {
+    int choice;
+    do {
+        cout << "\n========= Invoice System =========\n";
+        cout << "1. Add Customer\n";
+        cout << "2. Add Product\n";
+        cout << "3. Create Invoice\n";
+        cout << "4. View Invoices\n";
+        cout << "0. Exit\n";
+        cout << "Enter choice: ";
+        cin >> choice;
+
+        switch (choice) {
+            case 1: addCustomer(); break;
+            case 2: addProduct(); break;
+            case 3: createInvoice(); break;
+            case 4: viewInvoices(); break;
+            case 0: cout << "Exiting...\n"; break;
+            default: cout << "Invalid choice.\n";
+        }
+    } while (choice != 0);
+
+    return 0;
+}
